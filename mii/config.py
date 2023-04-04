@@ -3,6 +3,7 @@ from typing import Union, List
 from enum import Enum
 from pydantic import BaseModel, validator, root_validator
 
+from deepspeed.runtime.config_utils import DeepSpeedConfigModel
 from deepspeed.launcher.runner import DLTS_HOSTFILE
 
 from .utils import logger
@@ -36,7 +37,7 @@ class DtypeEnum(Enum):
 
 
 # inherit from https://github.com/microsoft/DeepSpeed/blob/fcb868e27c3993aab8aa151ca579456cb32dcee5/deepspeed/runtime/config_utils.py#L16
-class MIIConfig(BaseModel):
+class MIIConfig(DeepSpeedConfigModel):
     tensor_parallel: int = 1
     port_number: int = 50050
     dtype: DtypeEnum = torch.float32
