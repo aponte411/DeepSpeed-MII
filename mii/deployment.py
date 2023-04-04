@@ -2,6 +2,7 @@
 Copyright 2022 The Microsoft DeepSpeed Team
 '''
 import torch
+import json
 import string
 
 import mii
@@ -23,7 +24,8 @@ def deploy(task,
            enable_zero=False,
            ds_config=None,
            mii_config={},
-           version=1):
+           version=1,
+           **kwargs):
     """Deploy a task using specified model. For usage examples see:
 
         mii/examples/local/text-generation-example.py
@@ -65,8 +67,27 @@ def deploy(task,
 
     """
     # TODO: parse dictionary and create MIIConfig
+    if mii_config is None:
+        config = {}
+    if isinstance(mii_config, str):
+        with open(mii_config, "r") as f:
+            config_dict = json.load(f)
+    elif isinstance(mii_config, dict):
+        config_dict = config
+    else:
+        raise ValueError(f"'mii_config' argument expected str or dict, got type {type(mii_config)}")
+
+    # Update with values from kwargs
+    overlap_keys = set(config_dict.keys()).intersection(kwargs.keys())
+    for key in overlap_keys:
+        # If keys dont match, raise value error
+        if config_dict[key] != kwargs[key]:
+            raise ValueError(f"Conflicting argument '{key}' in 'config':{config_dict[key]} and kwargs:{kwargs[key]}")
+    # Update config dict with kwargs values set by user
+    config_dict.update(kwargs)
     # parse and validate mii config
     mii_config = mii.config.MIIConfig(**mii_config)
+
     if enable_zero:
         if ds_config.get("fp16", {}).get("enabled", False):
             assert (mii_config.dtype == torch.half), "MII Config Error: MII dtype and ZeRO dtype must match"
