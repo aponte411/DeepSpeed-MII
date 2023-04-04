@@ -64,6 +64,7 @@ def deploy(task,
         If deployment_type is `LOCAL`, returns just the name of the deployment that can be used to create a query handle using `mii.mii_query_handle(deployment_name)`
 
     """
+    # TODO: parse dictionary and create MIIConfig
     # parse and validate mii config
     mii_config = mii.config.MIIConfig(**mii_config)
     if enable_zero:
@@ -88,14 +89,15 @@ def deploy(task,
 
     if enable_deepspeed:
         logger.info(
-            f"************* MII is using DeepSpeed Optimizations to accelerate your model *************"
+            "************* MII is using DeepSpeed Optimizations to accelerate your model *************"
         )
     else:
         logger.info(
-            f"************* DeepSpeed Optimizations not enabled. Please use enable_deepspeed to get better performance *************"
+            "************* DeepSpeed Optimizations not enabled. Please use enable_deepspeed to get better performance *************"
         )
 
     # In local deployments use default path if no model path set
+    # TODO: move checks like this to MIIConfig
     if model_path is None and deployment_type == DeploymentType.LOCAL:
         model_path = MII_MODEL_PATH_DEFAULT
     elif model_path is None and deployment_type == DeploymentType.AML:
