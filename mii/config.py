@@ -35,6 +35,7 @@ class DtypeEnum(Enum):
         )
 
 
+# inherit from https://github.com/microsoft/DeepSpeed/blob/fcb868e27c3993aab8aa151ca579456cb32dcee5/deepspeed/runtime/config_utils.py#L16
 class MIIConfig(BaseModel):
     tensor_parallel: int = 1
     port_number: int = 50050
