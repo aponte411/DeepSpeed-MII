@@ -7,6 +7,7 @@ from deepspeed.runtime.config_utils import DeepSpeedConfigModel
 from deepspeed.launcher.runner import DLTS_HOSTFILE
 
 from .utils import logger
+from .constants import DeploymentType, MII_MODEL_PATH_DEFAULT
 
 
 class DtypeEnum(Enum):
@@ -56,6 +57,20 @@ class MIIConfig(DeepSpeedConfigModel):
     enable_load_balancing: bool = False
     replica_num: int = 1
     hostfile: str = DLTS_HOSTFILE
+    task: str = None
+    deployment_type: str = None
+    model_path: str = MII_MODEL_PATH_DEFAULT
+    version: int = 1
+
+    @validator("model_path")
+    def model_path_valid(cls, field_value, values):
+        if "model_path" not in values:
+            raise ValueError
+        if field_value is None and cls.deployment_type== DeploymentType.LOCAL:
+            field_value = MII_MODEL_PATH_DEFAULT
+        elif field_value is None and cls.deployment_type == DeploymentType.AML:
+            field_value = "model"
+        return field_value
 
     @validator("deploy_rank")
     def deploy_valid(cls, field_value, values):

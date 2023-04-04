@@ -1,30 +1,30 @@
 '''
 Copyright 2022 The Microsoft DeepSpeed Team
 '''
-import torch
+from typing import Optional, Dict, Any
 import json
 import string
 
-import mii
-
+import torch
 from deepspeed.launcher.runner import fetch_hostfile
 
-from .constants import DeploymentType, MII_MODEL_PATH_DEFAULT
+import mii
+from .constants import DeploymentType
 from .utils import logger
 from .models.score import create_score_file
 from .config import ReplicaConfig, LoadBalancerConfig
 
 
-def deploy(task,
-           model,
-           deployment_name,
-           deployment_type=DeploymentType.LOCAL,
-           model_path=None,
-           enable_deepspeed=True,
-           enable_zero=False,
-           ds_config=None,
-           mii_config={},
-           version=1,
+def deploy(task: str,
+           model: str,
+           deployment_name: str,
+           deployment_type: str = DeploymentType.LOCAL,
+           model_path: Optional[str]=None,
+           enable_deepspeed: bool = True,
+           enable_zero: bool = False,
+           ds_config: Dict[str,Any]=None,
+           mii_config: Optional[str, Dict, None]={},
+           version: int =1,
            **kwargs):
     """Deploy a task using specified model. For usage examples see:
 
@@ -88,20 +88,21 @@ def deploy(task,
     # parse and validate mii config
     mii_config = mii.config.MIIConfig(**mii_config)
 
-    if enable_zero:
-        if ds_config.get("fp16", {}).get("enabled", False):
+    # TODO: Move all validations to MIIConfig
+    if mii_config.enable_zero:
+        if mii_config.ds_config.get("fp16", {}).get("enabled", False):
             assert (mii_config.dtype == torch.half), "MII Config Error: MII dtype and ZeRO dtype must match"
         else:
             assert (mii_config.dtype == torch.float), "MII Config Error: MII dtype and ZeRO dtype must match"
-    assert not (enable_deepspeed and enable_zero), "MII Config Error: DeepSpeed and ZeRO cannot both be enabled, select only one"
+    assert not (mii_config.enable_deepspeed and mii_config.enable_zero), "MII Config Error: DeepSpeed and ZeRO cannot both be enabled, select only one"
 
     # aml only allows certain characters for deployment names
-    if deployment_type == DeploymentType.AML:
+    if mii_config.deployment_type == DeploymentType.AML:
         allowed_chars = set(string.ascii_lowercase + string.ascii_uppercase +
                             string.digits + '-')
         assert set(deployment_name) <= allowed_chars, "AML deployment names can only contain a-z, A-Z, 0-9, and '-'"
 
-    task = mii.utils.get_task(task)
+    task = mii.utils.get_task(mii_config.task)
 
     if not mii_config.skip_model_check:
         mii.utils.check_if_task_and_model_is_valid(task, model)
@@ -116,13 +117,6 @@ def deploy(task,
         logger.info(
             "************* DeepSpeed Optimizations not enabled. Please use enable_deepspeed to get better performance *************"
         )
-
-    # In local deployments use default path if no model path set
-    # TODO: move checks like this to MIIConfig
-    if model_path is None and deployment_type == DeploymentType.LOCAL:
-        model_path = MII_MODEL_PATH_DEFAULT
-    elif model_path is None and deployment_type == DeploymentType.AML:
-        model_path = "model"
 
     # add fields for replica deployment
     lb_config = None
@@ -148,20 +142,20 @@ def deploy(task,
                                        replica_configs=replica_configs)
 
     create_score_file(deployment_name=deployment_name,
-                      deployment_type=deployment_type,
+                      deployment_type=mii_config.deployment_type,
                       task=task,
                       model_name=model,
-                      ds_optimize=enable_deepspeed,
-                      ds_zero=enable_zero,
-                      ds_config=ds_config,
+                      ds_optimize=mii_config.enable_deepspeed,
+                      ds_zero=mii_config.enable_zero,
+                      ds_config=mii_config.ds_config,
                       mii_config=mii_config,
-                      model_path=model_path,
+                      model_path=mii_config.model_path,
                       lb_config=lb_config)
 
-    if deployment_type == DeploymentType.AML:
-        _deploy_aml(deployment_name=deployment_name, model_name=model, version=version)
-    elif deployment_type == DeploymentType.LOCAL:
-        return _deploy_local(deployment_name, model_path=model_path)
+    if mii_config.deployment_type == DeploymentType.AML:
+        _deploy_aml(deployment_name=mii_config.deployment_name, model_name=model, version=mii_config.version)
+    elif mii_config.deployment_type == DeploymentType.LOCAL:
+        return _deploy_local(mii_config.deployment_name, model_path=model_path)
     else:
         raise Exception(f"Unknown deployment type: {deployment_type}")
 
