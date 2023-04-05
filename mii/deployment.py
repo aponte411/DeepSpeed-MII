@@ -3,9 +3,7 @@ Copyright 2022 The Microsoft DeepSpeed Team
 '''
 from typing import Optional, Dict, Any
 import json
-import string
 
-import torch
 from deepspeed.launcher.runner import fetch_hostfile
 
 import mii
@@ -88,28 +86,14 @@ def deploy(task: str,
     # parse and validate mii config
     mii_config = mii.config.MIIConfig(**mii_config)
 
-    # TODO: Move all validations to MIIConfig
-    if mii_config.enable_zero:
-        if mii_config.ds_config.get("fp16", {}).get("enabled", False):
-            assert (mii_config.dtype == torch.half), "MII Config Error: MII dtype and ZeRO dtype must match"
-        else:
-            assert (mii_config.dtype == torch.float), "MII Config Error: MII dtype and ZeRO dtype must match"
-    assert not (mii_config.enable_deepspeed and mii_config.enable_zero), "MII Config Error: DeepSpeed and ZeRO cannot both be enabled, select only one"
-
-    # aml only allows certain characters for deployment names
-    if mii_config.deployment_type == DeploymentType.AML:
-        allowed_chars = set(string.ascii_lowercase + string.ascii_uppercase +
-                            string.digits + '-')
-        assert set(deployment_name) <= allowed_chars, "AML deployment names can only contain a-z, A-Z, 0-9, and '-'"
-
     task = mii.utils.get_task(mii_config.task)
 
     if not mii_config.skip_model_check:
         mii.utils.check_if_task_and_model_is_valid(task, model)
-        if enable_deepspeed:
+        if mii_config.enable_deepspeed:
             mii.utils.check_if_task_and_model_is_supported(task, model)
 
-    if enable_deepspeed:
+    if mii_config.enable_deepspeed:
         logger.info(
             "************* MII is using DeepSpeed Optimizations to accelerate your model *************"
         )

@@ -1,5 +1,6 @@
 import torch
-from typing import Union, List
+import string
+from typing import Union, List, Optional, Dict
 from enum import Enum
 from pydantic import BaseModel, validator, root_validator
 
@@ -58,17 +59,40 @@ class MIIConfig(DeepSpeedConfigModel):
     replica_num: int = 1
     hostfile: str = DLTS_HOSTFILE
     task: str = None
-    deployment_type: str = None
+    deployment_type: str = DeploymentType.LOCAL
     model_path: str = MII_MODEL_PATH_DEFAULT
     version: int = 1
+    enable_deepspeed: bool = True
+    enable_zero: bool = False
+    deepspeed_config: Dict = {}
+
+    @validator("deployment_type")
+    def deployment_type_valid(cls, field_value, values):
+        if field_value == DeploymentType.AML:
+            allowed_chars = set(
+                string.ascii_lowercase+string.ascii_uppercase+string.digits+"-"
+            )
+            assert set(values["deployment_name"]) <= allowed_chars, "AML Deploymentname invalid"
+        return field_value
+
+    @validator("enable_zero")
+    def enable_zero_valid(cls, field_value, values):
+        if field_value:
+            # ensure that the deepspeed config types match
+            if values["deepspeed_config"].get("fp16",{}).get("enabled", False):
+                assert values["dtype"] == torch.half, "MII dtype and ZeRO dtype must match"
+            else:
+                assert values["dtype"] == torch.float, "MII dtype and ZeRO dtype must match"
+        assert not (values["enable_deepspeed"] and values["enable_zero"]), "DeepSpeed and ZeRO cannot be enable at the same time."
+        return field_value
 
     @validator("model_path")
     def model_path_valid(cls, field_value, values):
         if "model_path" not in values:
             raise ValueError
-        if field_value is None and cls.deployment_type== DeploymentType.LOCAL:
+        if field_value is None and values["deployment_type"]== DeploymentType.LOCAL:
             field_value = MII_MODEL_PATH_DEFAULT
-        elif field_value is None and cls.deployment_type == DeploymentType.AML:
+        elif field_value is None and values["deployment_type"] == DeploymentType.AML:
             field_value = "model"
         return field_value
 
@@ -123,7 +147,7 @@ class MIIConfig(DeepSpeedConfigModel):
 class ReplicaConfig(BaseModel):
     hostname: str = ""
     tensor_parallel_ports: List[int] = []
-    torch_dist_port: int = None
+    torch_dist_port: Optional[int] = None
     gpu_indices: List[int] = []
 
     class Config:
